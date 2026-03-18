@@ -13,4 +13,5 @@ pubspec.lock
 __pycache__/
 target/
 bin/
+engines/java/.gradle/
 packaging/windows/Product.generated.wxs
