@@ -1,0 +1,27 @@
+{
+  "requestId": "req-list-1",
+  "ok": true,
+  "result": {
+    "items": [
+      {
+        "key": "images/",
+        "name": "images/",
+        "size": 0,
+        "storageClass": "FOLDER",
+        "isFolder": true
+      },
+      {
+        "key": "images/photo-001.jpg",
+        "name": "photo-001.jpg",
+        "size": 6291456,
+        "storageClass": "STANDARD",
+        "isFolder": false
+      }
+    ],
+    "cursor": {
+      "value": null,
+      "hasMore": false
+    }
+  }
+}
+

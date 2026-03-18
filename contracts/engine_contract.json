@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "S3 Browser Engine Contract",
+  "type": "object",
+  "required": [
+    "requestId",
+    "method",
+    "engineVersion"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "health",
+        "getCapabilities",
+        "testProfile",
+        "listBuckets",
+        "deleteBucket",
+        "setBucketVersioning",
+        "putBucketLifecycle",
+        "deleteBucketLifecycle",
+        "putBucketPolicy",
+        "deleteBucketPolicy",
+        "putBucketCors",
+        "deleteBucketCors",
+        "putBucketEncryption",
+        "deleteBucketEncryption",
+        "putBucketTagging",
+        "deleteBucketTagging",
+        "listObjects",
+        "getBucketAdminState",
+        "listObjectVersions",
+        "getObjectDetails",
+        "startUpload",
+        "startDownload",
+        "pauseTransfer",
+        "resumeTransfer",
+        "cancelTransfer",
+        "deleteObjects",
+        "deleteObjectVersions",
+        "copyObject",
+        "moveObject",
+        "createFolder",
+        "generatePresignedUrl",
+        "runPutTestData",
+        "runDeleteAll",
+        "cancelToolExecution",
+        "startBenchmark",
+        "getBenchmarkStatus",
+        "pauseBenchmark",
+        "resumeBenchmark",
+        "stopBenchmark",
+        "exportBenchmarkResults"
+      ]
+    },
+    "engineVersion": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object"
+    }
+  }
+}

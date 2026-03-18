@@ -1,0 +1,16 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.tmp/
+build/
+dist/
+coverage/
+pubspec.lock
+*.class
+*.jar
+*.pyc
+__pycache__/
+target/
+bin/
+packaging/windows/Product.generated.wxs

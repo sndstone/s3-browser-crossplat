@@ -1,105 +1,63 @@
-# S3 Browser (Python/Tkinter)
+# S3 Browser Cross Platform
 
-A Linux-native S3 browser with endpoint management, bucket/object navigation, version awareness, and built-in tools for test data and bulk cleanup.
+`s3-browser-crossplat` is the monorepo for S3 Browser Cross Platform. It contains:
 
-## Features
+- A Flutter app shell for Windows, macOS, Linux, and Android
+- A versioned engine contract shared by Python, Go, Rust, and Java backends
+- Packaging and bootstrap scripts that fetch toolchains into a local temp cache
+- Contract fixtures and implementation documentation
 
-- Endpoint manager with per-endpoint HTTP/HTTPS selection and SSL verification toggle.
-- Bucket list, create/delete buckets, and lifecycle policy management.
-- Object browsing with prefix filter, folder navigation, flat view, and metadata/tags.
-- Multi-select download/delete for objects.
-- Versions tab with:
-  - Load all versions or selected object versions.
-  - Filters by prefix and text/regex.
-  - Toggle display of versions vs delete markers.
-  - Multi-select download/delete for versions.
-  - Summary counts for objects, versions, and delete markers.
-- Safety settings for retries, delays, and timeouts.
-- Tools menu to run `put-testdata.py` and `delete-all.py` with GUI options and cancel support.
+## Layout
 
-## Requirements
-
-- Python 3
-- `boto3`
-- Tkinter (usually bundled with Python on Linux)
-
-Install dependencies:
-
-```bash
-pip install boto3
+```text
+s3-browser-crossplat/
+├── apps/flutter_app
+├── contracts
+├── docs
+├── engines
+├── packaging
+├── scripts
+└── tests
 ```
 
-## Run
+## Current Status
+
+This repository now includes:
+
+- The initial Flutter application scaffold with adaptive Browser, Benchmark, and Settings workspaces
+- The shared domain models and engine interface expected by all backends
+- Mock engine wiring so the UI shell is functional before the real engines are completed
+- Language-specific engine stubs for Python, Go, Rust, and Java
+- Build/bootstrap scripts that stage dependencies into `.tmp` under the repo root
+
+## Bootstrap
+
+Linux/macOS:
 
 ```bash
-python s3_browser.py
+./scripts/bootstrap.sh
+./scripts/build.sh linux
 ```
 
-## Endpoint Configuration
+Windows PowerShell:
 
-Use `File -> Configure Endpoints` to add or edit S3 endpoints.
+```powershell
+.\scripts\build.ps1
+.\scripts\build.ps1 -Platform windows
+.\scripts\build.ps1 -Platform windows -IncludeEngineToolchains
+.\scripts\build.ps1 -Platform android
+```
 
-Fields:
-- Name
-- Endpoint URL (host:port or full URL; scheme is chosen separately)
-- Access Key / Secret Key
-- Region
-- Scheme: `https` or `http`
-- Verify SSL: disable for self-signed endpoints or to bypass certificate checks
+The bootstrap scripts do not rely on system-installed Flutter, Go, Rust, or Java. They create a repo-local cache under `.tmp/toolchains` and reuse it across builds.
 
-If you see `ssl Wrong_version_number`, verify the scheme or disable SSL verification.
+Windows builds now handle the symlink prerequisite in the same script. If Developer Mode is off, `build.ps1` will prompt for elevation and rerun itself automatically.
 
-## Object Browsing
+Windows desktop packaging also stages the Python, Go, Rust, and Java sidecars into the app bundle, so those toolchains are bootstrapped during a Windows build by default. Use `-IncludeEngineToolchains` when you want those extra backend toolchains staged for other targets too.
 
-- Select a bucket to list objects.
-- Use the Prefix filter to limit object listing.
-- Right-click an object to download, delete, or copy its key.
-- Select multiple objects to download or delete in bulk.
+Windows Android builds also stage an Android SDK under `.tmp/toolchains/android-sdk`, accept licenses, and emit a sideloadable arm64 APK at `apps/flutter_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`.
 
-## Versions Tab
+## Immediate Next Steps
 
-- `Show All Versions` loads all versions for the current bucket (prefix filter is applied server-side if set).
-- Selecting an object loads only versions for that key.
-- Filters:
-  - Prefix: filters by object key prefix.
-  - Text/Regex: filters by key or version id (toggle regex).
-  - Toggle Versions/Delete Markers to narrow what you see.
-- Summary label shows total entries, object count, versions, and delete markers.
-
-## Safety Settings
-
-`Settings -> Safety Settings` provides:
-- Max retries
-- Retry base/max delay
-- Optional per-request delay
-- Connect/read timeouts
-
-These settings are applied to new S3 client connections and used to add retry/backoff behavior around API calls.
-
-## Tools
-
-### Put Test Data
-`Tools -> Put Test Data...`
-
-GUI options mirror `put-testdata.py` arguments, including:
-- Bucket, endpoint, access key, secret key
-- Object size, versions, objects count
-- Prefix, thread count, checksum, debug
-
-### Delete All
-`Tools -> Delete All...`
-
-GUI options mirror `delete-all.py` arguments, including:
-- Bucket, endpoint, access key, secret key
-- Batch size, max workers, retries, retry mode
-- Connections, pipeline size, list max keys
-- Immediate deletion toggle, deletion delay, debug
-
-Both tools support cancel and show output in the GUI.
-
-## Files
-
-- `s3_browser.py`: main GUI application
-- `put-testdata.py`: test data generator
-- `delete-all.py`: high-performance delete tool
-- `s3-browser-launcher.sh`: launcher script
+1. Replace the mock engine with the first real desktop sidecar implementation.
+2. Flesh out the contract test runner against MinIO and AWS S3.
+3. Wire the desktop build scripts to signed packaging infrastructure for your target environments.

@@ -1,0 +1,72 @@
+# Backend Feature Matrix
+
+This file is the required parity checklist for all backend engines. A feature is only considered complete when every supported engine on a platform implements the same request and response semantics.
+
+Legend:
+
+- `Required`: must be implemented for all engines on supported platforms
+- `Capability-Gated`: UI may expose only when the target reports support
+- `Desktop Only`: required on Windows, macOS, and Linux
+- `Android`: required on Android engines
+
+## Core Browser Features
+
+| Feature | Python | Go | Rust | Java | Android | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Health and engine descriptor | Required | Required | Required | Required | Rust/Go | Stubbed |
+| Endpoint profile validation | Required | Required | Required | Required | Rust/Go | Stubbed |
+| Capability detection | Required | Required | Required | Required | Rust/Go | Stubbed |
+| Bucket listing | Required | Required | Required | Required | Rust/Go | Stubbed |
+| Bucket create/delete | Required | Required | Required | Required | Rust/Go | Planned |
+| Bucket versioning get/set | Required | Required | Required | Required | Rust/Go | Planned |
+| Bucket lifecycle CRUD | Capability-Gated | Capability-Gated | Capability-Gated | Capability-Gated | Rust/Go | Planned |
+| Bucket policy CRUD | Capability-Gated | Capability-Gated | Capability-Gated | Capability-Gated | Rust/Go | Planned |
+| Bucket CORS CRUD | Capability-Gated | Capability-Gated | Capability-Gated | Capability-Gated | Rust/Go | Planned |
+| Bucket encryption read/write | Capability-Gated | Capability-Gated | Capability-Gated | Capability-Gated | Rust/Go | Planned |
+| Bucket tagging read/write | Capability-Gated | Capability-Gated | Capability-Gated | Capability-Gated | Rust/Go | Planned |
+| Object list pagination | Required | Required | Required | Required | Rust/Go | Stubbed |
+| Flat and hierarchical listing | Required | Required | Required | Required | Rust/Go | Planned |
+| Metadata, headers, and tags | Required | Required | Required | Required | Rust/Go | Planned |
+| Version listing and delete markers | Required | Required | Required | Required | Rust/Go | Planned |
+| Upload | Required | Required | Required | Required | Rust/Go | Planned |
+| Download | Required | Required | Required | Required | Rust/Go | Planned |
+| Delete single and batch | Required | Required | Required | Required | Rust/Go | Planned |
+| Copy, move, rename | Required | Required | Required | Required | Rust/Go | Planned |
+| Create folder marker | Required | Required | Required | Required | Rust/Go | Planned |
+| Presigned URL generation | Required | Required | Required | Required | Rust/Go | Planned |
+| Resumable transfer jobs | Desktop Only | Desktop Only | Desktop Only | Desktop Only | Optional | Planned |
+| Drag and drop ingest | Desktop Only | Desktop Only | Desktop Only | Desktop Only | N/A | App shell ready |
+
+## Benchmark Features
+
+| Feature | Python | Go | Rust | Java | Android | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Benchmark config validation | Required | Required | Required | Required | Rust/Go | Planned |
+| Mixed/write/read/delete workloads | Required | Required | Required | Required | Rust/Go | Planned |
+| Duration and operation count modes | Required | Required | Required | Required | Rust/Go | Planned |
+| Pause/resume/stop | Required | Required | Required | Required | Rust/Go | Planned |
+| CSV export | Required | Required | Required | Required | Rust/Go | Planned |
+| In-app charts input schema | Required | Required | Required | Required | Rust/Go | Stubbed |
+
+## Error and Reliability Requirements
+
+Every engine must return typed error codes for:
+
+- `auth_failed`
+- `tls_error`
+- `timeout`
+- `throttled`
+- `unsupported_feature`
+- `invalid_config`
+- `object_conflict`
+- `partial_batch_failure`
+- `engine_unavailable`
+- `unknown`
+
+Every engine must:
+
+- Avoid unhandled process crashes for recoverable API failures
+- Return structured partial-failure payloads for batch operations
+- Provide progress events for long-running transfers and benchmark runs
+- Respect cancellation requests from the UI shell
+

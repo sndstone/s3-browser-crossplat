@@ -1,0 +1,6 @@
+app: S3BrowserCrossplat
+ingredients:
+  script:
+    - mkdir -p AppDir/usr/bin
+    - cp -r ../../apps/flutter_app/build/linux/x64/release/bundle/* AppDir/usr/bin/
+

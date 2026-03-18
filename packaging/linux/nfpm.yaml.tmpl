@@ -1,0 +1,20 @@
+name: s3-browser-crossplat
+arch: {{ARCH}}
+platform: linux
+version: 2.0.8
+section: utils
+priority: optional
+maintainer: S3 Browser Cross Platform
+description: Cross-platform S3 browser with pluggable backend engines
+homepage: https://example.invalid/s3-browser-crossplat
+license: Proprietary
+contents:
+  - src: {{ROOT}}/usr/lib/s3-browser-crossplat/
+    dst: /usr/lib/s3-browser-crossplat
+  - src: {{ROOT}}/usr/bin/s3-browser-crossplat
+    dst: /usr/bin/s3-browser-crossplat
+overrides:
+  deb:
+    file_name_template: "{{ .ConventionalFileName }}"
+  rpm:
+    file_name_template: "{{ .ConventionalFileName }}"

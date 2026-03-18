@@ -1,0 +1,79 @@
+name: Release Matrix
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runs_on: windows-2022
+          - arch: arm64
+            runs_on: windows-11-arm
+    runs-on: ${{ matrix.runs_on }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Windows MSI
+        shell: pwsh
+        run: .\scripts\build.ps1 -Platform windows -Arch ${{ matrix.arch }} -Installer msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: dist/windows/*
+
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            package: deb
+            runs_on: ubuntu-24.04
+          - arch: aarch64
+            package: deb
+            runs_on: ubuntu-24.04-arm
+          - arch: x86_64
+            package: rpm
+            runs_on: ubuntu-24.04
+          - arch: aarch64
+            package: rpm
+            runs_on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs_on }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Linux package
+        run: ./scripts/build.sh linux ${{ matrix.arch }} ${{ matrix.package }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.package }}-${{ matrix.arch }}
+          path: dist/linux/*
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build macOS arm64 bundle
+        run: ./scripts/build.sh macos arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: apps/flutter_app/build/macos/**/*
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Android arm64 artifacts
+        run: ./scripts/build.sh android arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64
+          path: |
+            apps/flutter_app/build/app/outputs/flutter-apk/*.apk
+            apps/flutter_app/build/app/outputs/bundle/release/*.aab
