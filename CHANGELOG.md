@@ -1,11 +1,19 @@
 # Changelog
 
-## 2.0.8 - 2026-03-18
+## 2.0.10 - 2026-03-25
 
-- Fixed macOS desktop sandbox entitlements so outbound S3 traffic and Downloads-folder exports no longer fail with `io error` and `Operation not permitted`.
-- Improved Event Log export UX with a visible export path plus direct open-log and reveal-in-folder actions.
-- Moved staged macOS sidecars into `Contents/Resources/engines` and clean stale sidecars before Xcode assemble so repeated macOS builds do not fail during codesign.
-- Renamed the user-facing product title to `S3 Browser Cross Platform` across the app shell and platform packaging metadata.
+- Refined the Tasks tab selector hover and selection styling to remove the awkward square overlay artifact.
+- Fixed the Inspector tab chips so the selected state no longer renders the broken default icon/check treatment.
+- Bumped app, sidecar, and packaging metadata to 2.0.10.
+
+## 2.0.9 - 2026-03-24
+
+- Fixed the Android native bridge build issues and bumped app, sidecar, and packaging metadata to 2.0.9.
+
+## 2.0.8 - 2026-03-22
+
+- Improved Event Log and inspector trace rendering with grouped send/response cards.
+- Added separate log text scaling and phone-oriented layout updates.
 - Bumped app, sidecar, and packaging metadata to 2.0.8.
 
 ## 2.0.7 - 2026-03-16
@@ -37,7 +45,7 @@
 
 ## 2.0.0 - 2026-03-08
 
-- Rebuilt the project as `S3 Browser Cross Platform`, a Flutter-based cross-platform S3 browser targeting Windows, macOS, Linux, and Android.
+- Rebuilt the project as `S3 Browser Crossplat`, a Flutter-based cross-platform S3 browser targeting Windows, macOS, Linux, and Android.
 - Added a desktop sidecar engine model with packaged Python, Go, Rust, and Java engines, with the Python engine implemented as the first real S3 backend.
 - Added Windows MSI packaging and engine staging so desktop releases bundle the app plus the engine sidecars under `engines/`.
 - Added a benchmark workspace, adaptive navigation shell, clustered settings, and an Event Log workspace with export support.
@@ -49,4 +57,4 @@
 
 ## 1.x
 
-- Legacy Python Tkinter S3 browser implementation before the `S3 Browser Cross Platform` rewrite.
+- Legacy Python Tkinter S3 browser implementation before the `S3 Browser Crossplat` rewrite.

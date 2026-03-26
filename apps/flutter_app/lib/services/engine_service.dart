@@ -29,6 +29,14 @@ class EngineLogRecord {
     this.bucketName,
     this.objectKey,
     this.source,
+    this.requestId,
+    this.tracePhase,
+    this.engineId,
+    this.method,
+    this.responseStatus,
+    this.latencyMs,
+    this.traceHead,
+    this.traceBody,
   });
 
   final String level;
@@ -38,6 +46,14 @@ class EngineLogRecord {
   final String? bucketName;
   final String? objectKey;
   final String? source;
+  final String? requestId;
+  final String? tracePhase;
+  final String? engineId;
+  final String? method;
+  final String? responseStatus;
+  final int? latencyMs;
+  final Object? traceHead;
+  final Object? traceBody;
 }
 
 abstract interface class EngineLogSinkRegistrant {

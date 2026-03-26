@@ -71,7 +71,7 @@ ensure_command() {
 
 resolve_stage_root() {
   if [[ "$RELEASE_DIR" == *.app ]]; then
-    printf '%s\n' "$RELEASE_DIR/Contents/Resources/engines"
+    printf '%s\n' "$RELEASE_DIR/Contents/MacOS/engines"
   else
     printf '%s\n' "$RELEASE_DIR/engines"
   fi
@@ -275,13 +275,13 @@ import sys
 manifest_path = sys.argv[1]
 arch = sys.argv[2]
 manifest = {
-    "version": "2.0.8",
+    "version": "2.0.10",
     "architecture": arch,
     "generatedAt": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
     "engines": [
         {
             "id": "python",
-            "version": "2.0.8",
+            "version": "2.0.10",
             "executable": "python/run-python-engine.sh",
             "arguments": [],
             "workingDirectory": "python",
@@ -292,7 +292,7 @@ manifest = {
         },
         {
             "id": "go",
-            "version": "2.0.8",
+            "version": "2.0.10",
             "executable": "go/s3-browser-go-engine",
             "arguments": [],
             "workingDirectory": "go",
@@ -302,7 +302,7 @@ manifest = {
         },
         {
             "id": "rust",
-            "version": "2.0.8",
+            "version": "2.0.10",
             "executable": "rust/s3-browser-rust-engine",
             "arguments": [],
             "workingDirectory": "rust",
@@ -312,7 +312,7 @@ manifest = {
         },
         {
             "id": "java",
-            "version": "2.0.8",
+            "version": "2.0.10",
             "executable": "java/run-java-engine.sh",
             "arguments": [],
             "workingDirectory": "java",

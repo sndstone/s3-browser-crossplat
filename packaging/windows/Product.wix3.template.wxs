@@ -1,28 +1,28 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product
       Id="*"
-      Name="S3 Browser Cross Platform"
+      Name="S3 Browser Crossplat"
       Language="1033"
       Version="{{VERSION}}"
-      Manufacturer="S3 Browser Cross Platform"
+      Manufacturer="S3 Browser Crossplat"
       UpgradeCode="A9D78739-1FB3-4514-9A77-91BDB25CFC39">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of S3 Browser Cross Platform is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of S3 Browser Crossplat is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="S3 Browser Cross Platform">
+        <Directory Id="INSTALLFOLDER" Name="S3 Browser Crossplat">
 {{DIRECTORY_TREE}}
         </Directory>
       </Directory>
       <Directory Id="ProgramMenuFolder">
-        <Directory Id="ProgramMenuDir" Name="S3 Browser Cross Platform" />
+        <Directory Id="ProgramMenuDir" Name="S3 Browser Crossplat" />
       </Directory>
       <Directory Id="DesktopFolder" />
     </Directory>
 
-    <Feature Id="MainFeature" Title="S3 Browser Cross Platform" Level="1">
+    <Feature Id="MainFeature" Title="S3 Browser Crossplat" Level="1">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentGroupRef Id="ShortcutComponents" />
     </Feature>
@@ -39,7 +39,7 @@
       <Component Id="ApplicationShortcutComponent" Directory="ProgramMenuDir" Guid="*">
         <Shortcut
             Id="ApplicationStartMenuShortcut"
-            Name="S3 Browser Cross Platform"
+            Name="S3 Browser Crossplat"
             Target="[INSTALLFOLDER]s3_browser_crossplat.exe"
             WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="ProgramMenuDir" On="uninstall" />
@@ -48,7 +48,7 @@
       <Component Id="DesktopShortcutComponent" Directory="DesktopFolder" Guid="*">
         <Shortcut
             Id="ApplicationDesktopShortcut"
-            Name="S3 Browser Cross Platform"
+            Name="S3 Browser Crossplat"
             Target="[INSTALLFOLDER]s3_browser_crossplat.exe"
             WorkingDirectory="INSTALLFOLDER" />
         <RegistryValue Root="HKCU" Key="Software\S3BrowserCrossplat" Name="desktop" Type="integer" Value="1" KeyPath="yes" />

@@ -238,7 +238,6 @@ class AppController extends ChangeNotifier {
   bool showAllObjects = false;
   bool loading = false;
   String? bannerMessage;
-  String? lastExportedEventLogPath;
   VersionBrowserOptions versionBrowserOptions = const VersionBrowserOptions();
   late TestDataToolConfig testDataConfig;
   late DeleteAllToolConfig deleteAllConfig;
@@ -939,11 +938,13 @@ class AppController extends ChangeNotifier {
         transferJobs = [job, ...transferJobs];
         _trackTransferJob(job);
         bannerMessage = 'Started download job ${job.id}.';
+        final destinationLabel =
+            Platform.isAndroid ? 'Downloads' : settings.downloadPath;
         _addEvent(
           level: 'INFO',
           category: 'Transfers',
           message:
-              'Started download job ${job.id} for ${object.key} into ${settings.downloadPath}.',
+              'Started download job ${job.id} for ${object.key} into $destinationLabel.',
           includeSelectionContext: true,
           objectKey: object.key,
           source: 'task-tray',
@@ -1651,7 +1652,6 @@ class AppController extends ChangeNotifier {
           )
           .join('\n');
       await file.writeAsString(lines);
-      lastExportedEventLogPath = file.path;
       bannerMessage = 'Event log exported to ${file.path}.';
       _addEvent(
         level: 'INFO',
@@ -2240,6 +2240,14 @@ class AppController extends ChangeNotifier {
     String? bucketName,
     String? objectKey,
     String? source,
+    String? requestId,
+    String? tracePhase,
+    String? engineId,
+    String? method,
+    String? responseStatus,
+    int? latencyMs,
+    Object? traceHead,
+    Object? traceBody,
   }) {
     if ((level == 'API' || source == 'api') && !settings.enableApiLogging) {
       return;
@@ -2260,6 +2268,14 @@ class AppController extends ChangeNotifier {
         objectKey:
             objectKey ?? (includeSelectionContext ? selectedObject?.key : null),
         source: source,
+        requestId: requestId,
+        tracePhase: tracePhase,
+        engineId: engineId,
+        method: method,
+        responseStatus: responseStatus,
+        latencyMs: latencyMs,
+        traceHead: traceHead,
+        traceBody: traceBody,
       ),
       ...eventLog,
     ];
@@ -2291,6 +2307,14 @@ class AppController extends ChangeNotifier {
         bucketName: entry.bucketName,
         objectKey: entry.objectKey,
         source: entry.source,
+        requestId: entry.requestId,
+        tracePhase: entry.tracePhase,
+        engineId: entry.engineId,
+        method: entry.method,
+        responseStatus: entry.responseStatus,
+        latencyMs: entry.latencyMs,
+        traceHead: entry.traceHead,
+        traceBody: entry.traceBody,
       );
       notifyListeners();
     });

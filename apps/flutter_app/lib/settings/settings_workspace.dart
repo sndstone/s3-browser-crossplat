@@ -18,10 +18,18 @@ class SettingsWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = controller.settings;
+    final phone = MediaQuery.sizeOf(context).width < 700;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _sectionIntro(
+          context,
+          title: 'Settings',
+          description:
+              'Tune the storage shell, connection behavior, and transfer defaults without losing the desktop workflow.',
+        ),
+        const SizedBox(height: 16),
         _section(
           context,
           title: 'General',
@@ -248,7 +256,7 @@ class SettingsWorkspace extends StatelessWidget {
               contentPadding: EdgeInsets.zero,
               title: Text('UI scale: ${settings.uiScalePercent}%'),
               subtitle: const Text(
-                'Smaller values fit more controls onscreen. 80% is the current default density.',
+                'Smaller values fit more controls onscreen. 70% is the default density for fresh installs.',
               ),
             ),
             Slider(
@@ -260,6 +268,28 @@ class SettingsWorkspace extends StatelessWidget {
               onChanged: (value) {
                 controller.updateSettings(
                   settings.copyWith(uiScalePercent: value.round()),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Log text scale: ${settings.logTextScalePercent}%',
+              ),
+              subtitle: const Text(
+                'Applies only to Event Log and Events & Debug so trace text stays readable at smaller UI scales.',
+              ),
+            ),
+            Slider(
+              min: 80,
+              max: 130,
+              divisions: 10,
+              value: settings.logTextScalePercent.toDouble().clamp(80, 130),
+              label: '${settings.logTextScalePercent}%',
+              onChanged: (value) {
+                controller.updateSettings(
+                  settings.copyWith(logTextScalePercent: value.round()),
                 );
               },
             ),
@@ -300,29 +330,49 @@ class SettingsWorkspace extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _numberField(
-                    label: 'Connect timeout (s)',
-                    initialValue: settings.connectTimeoutSeconds,
-                    onSubmitted: (value) => controller.updateSettings(
-                      settings.copyWith(connectTimeoutSeconds: value),
-                    ),
+            phone
+                ? Column(
+                    children: [
+                      _numberField(
+                        label: 'Connect timeout (s)',
+                        initialValue: settings.connectTimeoutSeconds,
+                        onSubmitted: (value) => controller.updateSettings(
+                          settings.copyWith(connectTimeoutSeconds: value),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _numberField(
+                        label: 'Read timeout (s)',
+                        initialValue: settings.readTimeoutSeconds,
+                        onSubmitted: (value) => controller.updateSettings(
+                          settings.copyWith(readTimeoutSeconds: value),
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _numberField(
+                          label: 'Connect timeout (s)',
+                          initialValue: settings.connectTimeoutSeconds,
+                          onSubmitted: (value) => controller.updateSettings(
+                            settings.copyWith(connectTimeoutSeconds: value),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _numberField(
+                          label: 'Read timeout (s)',
+                          initialValue: settings.readTimeoutSeconds,
+                          onSubmitted: (value) => controller.updateSettings(
+                            settings.copyWith(readTimeoutSeconds: value),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _numberField(
-                    label: 'Read timeout (s)',
-                    initialValue: settings.readTimeoutSeconds,
-                    onSubmitted: (value) => controller.updateSettings(
-                      settings.copyWith(readTimeoutSeconds: value),
-                    ),
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 12),
             _numberField(
               label: 'Max pool connections',
@@ -479,21 +529,59 @@ class SettingsWorkspace extends StatelessWidget {
     required String title,
     required List<Widget> children,
   }) {
+    final theme = Theme.of(context);
+    final phone = MediaQuery.sizeOf(context).width < 700;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
-              ...children,
-            ],
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: phone
+              ? theme.colorScheme.surface.withValues(alpha: 0.84)
+              : theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionIntro(
+    BuildContext context, {
+    required String title,
+    required String description,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.surface,
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.42),
+            theme.colorScheme.secondaryContainer.withValues(alpha: 0.24),
+          ],
+        ),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 10),
+          Text(description, style: theme.textTheme.bodyLarge),
+        ],
       ),
     );
   }
@@ -757,6 +845,7 @@ class _ProfileEditorCardState extends State<_ProfileEditorCard> {
     final isTesting =
         widget.controller.isBusy('test-profile-${widget.profile.id}');
     final isSelecting = widget.controller.isBusy('select-profile');
+    final phone = MediaQuery.sizeOf(context).width < 700;
 
     return Card(
       child: Padding(
@@ -878,24 +967,43 @@ class _ProfileEditorCardState extends State<_ProfileEditorCard> {
               ),
             if (_normalizedEndpointPreview.isNotEmpty)
               const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _accessKeyController,
-                    decoration: const InputDecoration(labelText: 'Access key'),
+            phone
+                ? Column(
+                    children: [
+                      TextField(
+                        controller: _accessKeyController,
+                        decoration:
+                            const InputDecoration(labelText: 'Access key'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _secretKeyController,
+                        obscureText: true,
+                        decoration:
+                            const InputDecoration(labelText: 'Secret key'),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _accessKeyController,
+                          decoration:
+                              const InputDecoration(labelText: 'Access key'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _secretKeyController,
+                          obscureText: true,
+                          decoration:
+                              const InputDecoration(labelText: 'Secret key'),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _secretKeyController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Secret key'),
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 8),
             TextField(
               controller: _sessionTokenController,
@@ -930,28 +1038,49 @@ class _ProfileEditorCardState extends State<_ProfileEditorCard> {
                         : 'TLS verification is off because this endpoint uses HTTP.'),
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _connectTimeoutController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Connect timeout (s)',
-                    ),
+            phone
+                ? Column(
+                    children: [
+                      TextField(
+                        controller: _connectTimeoutController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Connect timeout (s)',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _readTimeoutController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Read timeout (s)',
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _connectTimeoutController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Connect timeout (s)',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _readTimeoutController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Read timeout (s)',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _readTimeoutController,
-                    keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: 'Read timeout (s)'),
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 8),
             TextField(
               controller: _notesController,

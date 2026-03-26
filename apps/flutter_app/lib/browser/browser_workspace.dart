@@ -5,11 +5,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/app_controller.dart';
+import '../logs/structured_log_list.dart';
 import '../models/domain_models.dart';
 
 const _bucketActionBarKey = ValueKey('bucket-panel-actions');
 const _bucketListKey = ValueKey('bucket-panel-scroll');
 const _bucketProfileSummaryKey = ValueKey('bucket-profile-summary');
+
+enum _MobileBrowserSection {
+  buckets,
+  objects,
+  inspector,
+}
 
 class BrowserWorkspace extends StatefulWidget {
   const BrowserWorkspace({
@@ -28,6 +35,7 @@ class BrowserWorkspace extends StatefulWidget {
 class _BrowserWorkspaceState extends State<BrowserWorkspace> {
   AppController get controller => widget.controller;
   double? _pendingInspectorSize;
+  _MobileBrowserSection _mobileSection = _MobileBrowserSection.objects;
 
   AppSettings get _settings => controller.settings;
 
@@ -57,22 +65,94 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
     );
   }
 
+  Future<void> _pickFilesAndUpload() async {
+    final picked = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+    );
+    if (picked == null) {
+      return;
+    }
+    final paths = picked.files.map((file) => file.path).whereType<String>().toList();
+    if (paths.isEmpty) {
+      return;
+    }
+    await controller.startSampleUpload(paths);
+  }
+
+  Widget _mobileBrowserShell(BuildContext context) {
+    final hasProfile = controller.selectedProfile != null;
+    final hasBucket = controller.selectedBucket != null;
+    final effectiveSection = !hasProfile
+        ? _MobileBrowserSection.buckets
+        : (!hasBucket && _mobileSection != _MobileBrowserSection.buckets)
+            ? _MobileBrowserSection.buckets
+            : _mobileSection;
+    final duration = controller.settings.enableAnimations
+        ? const Duration(milliseconds: 260)
+        : Duration.zero;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<_MobileBrowserSection>(
+              segments: const [
+                ButtonSegment(
+                  value: _MobileBrowserSection.buckets,
+                  icon: Icon(Icons.storage_outlined),
+                  label: Text('Buckets'),
+                ),
+                ButtonSegment(
+                  value: _MobileBrowserSection.objects,
+                  icon: Icon(Icons.topic_outlined),
+                  label: Text('Objects'),
+                ),
+                ButtonSegment(
+                  value: _MobileBrowserSection.inspector,
+                  icon: Icon(Icons.manage_search_outlined),
+                  label: Text('Inspect'),
+                ),
+              ],
+              selected: {effectiveSection},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                setState(() {
+                  _mobileSection = selection.first;
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          AnimatedSwitcher(
+            duration: duration,
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: KeyedSubtree(
+              key: ValueKey(effectiveSection),
+              child: switch (effectiveSection) {
+                _MobileBrowserSection.buckets =>
+                  _bucketPanel(context, compact: true),
+                _MobileBrowserSection.objects =>
+                  _objectPanel(context, compact: true),
+                _MobileBrowserSection.inspector =>
+                  _inspectorPanel(context, compact: true),
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final content = LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         if (width < 700) {
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _bucketPanel(context, compact: true),
-              const SizedBox(height: 16),
-              _objectPanel(context, compact: true),
-              const SizedBox(height: 16),
-              _inspectorPanel(context, compact: true),
-            ],
-          );
+          return _mobileBrowserShell(context);
         }
 
         final inspectorOnRight =
@@ -121,7 +201,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
       },
     );
 
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || MediaQuery.sizeOf(context).width < 700) {
       return content;
     }
 
@@ -173,6 +253,95 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
     );
 
     nameController.dispose();
+  }
+
+  Future<void> _showMobileObjectActions(BuildContext context) async {
+    final hasBucket = controller.selectedBucket != null;
+    final hasSelectedObject = controller.selectedObject != null;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Object actions',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Use the Android picker for uploads and keep object tools within thumb reach.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: hasBucket
+                        ? () {
+                            Navigator.of(context).pop();
+                            controller.refreshObjects();
+                          }
+                        : null,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasBucket
+                        ? () {
+                            Navigator.of(context).pop();
+                            _showCreatePrefixDialog(context);
+                          }
+                        : null,
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    label: const Text('Create prefix'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasSelectedObject
+                        ? () {
+                            Navigator.of(context).pop();
+                            controller.deleteSelectedObject();
+                          }
+                        : null,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasBucket
+                        ? () {
+                            Navigator.of(context).pop();
+                            controller.showAllObjectsNow();
+                          }
+                        : null,
+                    icon: const Icon(Icons.unfold_more),
+                    label: const Text('Show all'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                value: controller.flatView,
+                onChanged: hasBucket
+                    ? (value) {
+                        Navigator.of(context).pop();
+                        controller.toggleFlatView(value);
+                      }
+                    : null,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Flat view'),
+                subtitle: const Text('Show objects as a single list.'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _resizeHandle(Axis axis) {
@@ -259,6 +428,10 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
   }
 
   Widget _objectPanel(BuildContext context, {required bool compact}) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    final availableWidth = MediaQuery.sizeOf(context).width - 64;
+    final phonePanelHeight =
+        (MediaQuery.sizeOf(context).height * 0.72).clamp(600.0, 860.0);
     final hasProfile = controller.selectedProfile != null;
     final hasBucket = controller.selectedBucket != null;
     final hasSelectedObject = controller.selectedObject != null;
@@ -284,6 +457,9 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
             ),
           )
         : ListView.separated(
+            shrinkWrap: false,
+            primary: false,
+            physics: const AlwaysScrollableScrollPhysics(),
             itemBuilder: (context, index) {
               final object = objects[index];
               return ListTile(
@@ -304,7 +480,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
             itemCount: objects.length,
           );
 
-    return Card(
+    final panel = Card(
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -347,7 +523,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
               runSpacing: 12,
               children: [
                 SizedBox(
-                  width: 168,
+                  width: phone ? availableWidth : 168,
                   child: DropdownButtonFormField<BrowserFilterMode>(
                     initialValue: controller.objectFilterMode,
                     decoration: const InputDecoration(
@@ -377,7 +553,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
                   ),
                 ),
                 SizedBox(
-                  width: 240,
+                  width: phone ? availableWidth : 240,
                   child: TextFormField(
                     key: ValueKey(
                       'object-filter-${controller.objectFilterMode.name}-${controller.objectFilterValue}',
@@ -405,7 +581,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
                   ),
                 ),
                 SizedBox(
-                  width: 220,
+                  width: phone ? availableWidth : 220,
                   child: DropdownButtonFormField<BrowserObjectSortField>(
                     initialValue: controller.objectSortField,
                     isExpanded: true,
@@ -439,85 +615,120 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
                         : null,
                   ),
                 ),
-                IconButton(
-                  tooltip: controller.objectSortDescending
-                      ? 'Sort descending'
-                      : 'Sort ascending',
-                  onPressed:
-                      hasBucket ? controller.toggleObjectSortDirection : null,
-                  icon: Icon(
-                    controller.objectSortDescending
-                        ? Icons.arrow_downward
-                        : Icons.arrow_upward,
+                if (!phone)
+                  IconButton(
+                    tooltip: controller.objectSortDescending
+                        ? 'Sort descending'
+                        : 'Sort ascending',
+                    onPressed:
+                        hasBucket ? controller.toggleObjectSortDirection : null,
+                    icon: Icon(
+                      controller.objectSortDescending
+                          ? Icons.arrow_downward
+                          : Icons.arrow_upward,
+                    ),
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: hasBucket && !isUploading
-                      ? () async {
-                          final picked = await FilePicker.platform.pickFiles(
-                            allowMultiple: true,
-                          );
-                          if (picked == null) {
-                            return;
-                          }
-                          final paths = picked.files
-                              .map((file) => file.path)
-                              .whereType<String>()
-                              .toList();
-                          await controller.startSampleUpload(paths);
-                        }
-                      : null,
-                  icon: isUploading
-                      ? _inlineSpinner()
-                      : const Icon(Icons.upload_file),
-                  label: Text(isUploading ? 'Uploading...' : 'Upload'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: hasSelectedObject && !isDownloading
-                      ? controller.startSampleDownload
-                      : null,
-                  icon: isDownloading
-                      ? _inlineSpinner()
-                      : const Icon(Icons.download),
-                  label: Text(isDownloading ? 'Downloading...' : 'Download'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: hasSelectedObject && !isDeleting
-                      ? controller.deleteSelectedObject
-                      : null,
-                  icon: isDeleting
-                      ? _inlineSpinner()
-                      : const Icon(Icons.delete_outline),
-                  label: Text(isDeleting ? 'Deleting...' : 'Delete'),
-                ),
-                OutlinedButton.icon(
-                  onPressed:
-                      hasBucket ? () => _showCreatePrefixDialog(context) : null,
-                  icon: const Icon(Icons.create_new_folder_outlined),
-                  label: const Text('Create prefix'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: hasBucket ? controller.showAllObjectsNow : null,
-                  icon: const Icon(Icons.unfold_more),
-                  label: const Text('Show all'),
-                ),
-                FilterChip(
-                  selected: controller.flatView,
-                  onSelected: hasBucket ? controller.toggleFlatView : null,
-                  avatar: const Icon(Icons.view_stream_outlined, size: 18),
-                  label: const Text('Flat view'),
-                ),
-                IconButton(
-                  tooltip: 'Refresh object list',
-                  onPressed: hasBucket && !isRefreshingObjects
-                      ? controller.refreshObjects
-                      : null,
-                  icon: isRefreshingObjects
-                      ? _inlineSpinner()
-                      : const Icon(Icons.refresh),
-                ),
               ],
             ),
+            const SizedBox(height: 12),
+            if (phone)
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: hasBucket && !isUploading
+                          ? _pickFilesAndUpload
+                          : null,
+                      icon: isUploading
+                          ? _inlineSpinner()
+                          : const Icon(Icons.upload_file),
+                      label: Text(isUploading ? 'Uploading...' : 'Upload'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: hasSelectedObject && !isDownloading
+                          ? controller.startSampleDownload
+                          : null,
+                      icon: isDownloading
+                          ? _inlineSpinner()
+                          : const Icon(Icons.download),
+                      label:
+                          Text(isDownloading ? 'Downloading...' : 'Download'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton.filledTonal(
+                    tooltip: 'More actions',
+                    onPressed: hasBucket
+                        ? () => _showMobileObjectActions(context)
+                        : null,
+                    icon: const Icon(Icons.tune),
+                  ),
+                ],
+              )
+            else
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FilledButton.icon(
+                    onPressed:
+                        hasBucket && !isUploading ? _pickFilesAndUpload : null,
+                    icon: isUploading
+                        ? _inlineSpinner()
+                        : const Icon(Icons.upload_file),
+                    label: Text(isUploading ? 'Uploading...' : 'Upload'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasSelectedObject && !isDownloading
+                        ? controller.startSampleDownload
+                        : null,
+                    icon: isDownloading
+                        ? _inlineSpinner()
+                        : const Icon(Icons.download),
+                    label:
+                        Text(isDownloading ? 'Downloading...' : 'Download'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasSelectedObject && !isDeleting
+                        ? controller.deleteSelectedObject
+                        : null,
+                    icon: isDeleting
+                        ? _inlineSpinner()
+                        : const Icon(Icons.delete_outline),
+                    label: Text(isDeleting ? 'Deleting...' : 'Delete'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasBucket
+                        ? () => _showCreatePrefixDialog(context)
+                        : null,
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    label: const Text('Create prefix'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: hasBucket ? controller.showAllObjectsNow : null,
+                    icon: const Icon(Icons.unfold_more),
+                    label: const Text('Show all'),
+                  ),
+                  FilterChip(
+                    selected: controller.flatView,
+                    onSelected: hasBucket ? controller.toggleFlatView : null,
+                    avatar: const Icon(Icons.view_stream_outlined, size: 18),
+                    label: const Text('Flat view'),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh object list',
+                    onPressed: hasBucket && !isRefreshingObjects
+                        ? controller.refreshObjects
+                        : null,
+                    icon: isRefreshingObjects
+                        ? _inlineSpinner()
+                        : const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
             const SizedBox(height: 12),
             if (isRefreshingObjects || isSelectingObject)
               const Padding(
@@ -612,7 +823,9 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
               ),
             ),
             const SizedBox(height: 12),
-            if (compact)
+            if (phone)
+              Expanded(child: listView)
+            else if (compact)
               SizedBox(
                 height: (MediaQuery.sizeOf(context).height * 0.42)
                     .clamp(280.0, 520.0),
@@ -624,10 +837,21 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
         ),
       ),
     );
+
+    if (phone) {
+      return SizedBox(
+        height: phonePanelHeight,
+        child: panel,
+      );
+    }
+
+    return panel;
   }
 
   Widget _inspectorPanel(BuildContext context, {required bool compact}) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
     final tab = controller.inspectorTab;
+    final theme = Theme.of(context);
     final panelBody = AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
       child: switch (tab) {
@@ -677,14 +901,36 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
                 };
                 return ChoiceChip(
                   selected: selected,
-                  avatar: Icon(icon, size: 18),
+                  showCheckmark: false,
+                  avatar: Icon(
+                    icon,
+                    size: 18,
+                    color: selected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                  backgroundColor: theme.colorScheme.secondaryContainer
+                      .withValues(alpha: 0.72),
+                  selectedColor:
+                      theme.colorScheme.primaryContainer.withValues(alpha: 0.9),
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  labelStyle: theme.textTheme.labelLarge?.copyWith(
+                    color: selected
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurface,
+                  ),
                   label: Text(label),
                   onSelected: (_) => controller.setInspectorTab(entry),
                 );
               }).toList(),
             ),
             const SizedBox(height: 12),
-            if (compact)
+            if (phone)
+              panelBody
+            else if (compact)
               SizedBox(
                 height: (MediaQuery.sizeOf(context).height * 0.62)
                     .clamp(420.0, 920.0),
@@ -705,7 +951,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
           child: Text('Select a bucket to inspect configuration details.'));
     }
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('bucket-admin'),
       children: [
         Text(
@@ -747,7 +994,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
       );
     }
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('bucket-info'),
       children: [
         Text(bucket.name, style: Theme.of(context).textTheme.titleMedium),
@@ -887,7 +1135,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
               Text('Select an object to inspect metadata, headers, and tags.'));
     }
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('object-details'),
       children: [
         _inlineStat('Key', object.key),
@@ -936,7 +1185,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
     final versions = controller.visibleVersions;
     final hasSelectedObject = controller.selectedObject != null;
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('versions'),
       children: [
         Wrap(
@@ -1084,7 +1334,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
 
   Widget _presignView(BuildContext context) {
     final bundle = controller.selectedObjectDetails?.presignedUrl;
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('presign'),
       children: [
         _numberField(
@@ -1123,7 +1374,8 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
     final testData = controller.testDataConfig;
     final deleteAll = controller.deleteAllConfig;
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('tools'),
       children: [
         Text('Put test data', style: Theme.of(context).textTheme.titleMedium),
@@ -1314,11 +1566,16 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
 
   Widget _eventsAndDebugView(BuildContext context) {
     final details = controller.selectedObjectDetails;
-    final scopedEvents = controller.bucketScopedEvents;
+    final scopedEvents = controller.bucketScopedEvents.where((entry) {
+      if (details == null) {
+        return true;
+      }
+      return entry.objectKey == null || entry.objectKey == details.key;
+    }).toList();
     final debugEvents = details?.debugEvents ?? const <DiagnosticEvent>[];
-    final apiCalls = details?.apiCalls ?? const <ApiCallRecord>[];
 
-    return ListView(
+    return _adaptivePanelListView(
+      context,
       key: const ValueKey('events-and-debug'),
       children: [
         Wrap(
@@ -1344,23 +1601,15 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
           ],
         ),
         const SizedBox(height: 16),
-        Text('Bucket trace events',
+        Text('Trace log',
             style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        if (scopedEvents.isEmpty)
-          const Text('No bucket-scoped trace events recorded yet.')
-        else
-          ...scopedEvents.map(
-            (event) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text('[${event.level}] ${event.category}'),
-              subtitle: Text(
-                '${_formatDateTime(event.timestamp)}\n${event.message}',
-              ),
-              isThreeLine: true,
-            ),
-          ),
+        StructuredLogList(
+          entries: scopedEvents,
+          textScalePercent: controller.settings.logTextScalePercent,
+          emptyMessage: 'No bucket-scoped trace events recorded yet.',
+          embedded: true,
+        ),
         const Divider(height: 28),
         Text('Object debug events',
             style: Theme.of(context).textTheme.titleMedium),
@@ -1376,21 +1625,6 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
               subtitle: Text(_formatDateTime(event.timestamp)),
             ),
           ),
-        const Divider(height: 28),
-        Text('API calls', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        if (apiCalls.isEmpty)
-          const Text('No API calls recorded yet.')
-        else
-          ...apiCalls.map(
-            (call) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(call.operation),
-              subtitle: Text(_formatDateTime(call.timestamp)),
-              trailing: Text('${call.status} • ${call.latencyMs} ms'),
-            ),
-          ),
         if ((details?.debugLogExcerpt ?? const <String>[]).isNotEmpty) ...[
           const Divider(height: 28),
           Text('Debug excerpt', style: Theme.of(context).textTheme.titleMedium),
@@ -1401,6 +1635,23 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
     );
   }
 
+  Widget _adaptivePanelListView(
+    BuildContext context, {
+    required Key key,
+    required List<Widget> children,
+  }) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    return ListView(
+      key: key,
+      shrinkWrap: phone,
+      primary: false,
+      physics: phone
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
+      children: children,
+    );
+  }
+
   Widget _inlineStat(String label, String value) {
     final theme = Theme.of(context);
     return Padding(
@@ -1408,13 +1659,9 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
       child: RichText(
         text: TextSpan(
           style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.35,
-                color: theme.colorScheme.onSurface,
-              ) ??
-              TextStyle(
-                height: 1.35,
-                color: theme.colorScheme.onSurface,
-              ),
+            height: 1.35,
+            color: theme.colorScheme.onSurface,
+          ),
           children: [
             TextSpan(
               text: '$label: ',
@@ -1423,10 +1670,7 @@ class _BrowserWorkspaceState extends State<BrowserWorkspace> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            TextSpan(
-              text: value,
-              style: TextStyle(color: theme.colorScheme.onSurface),
-            ),
+            TextSpan(text: value),
           ],
         ),
       ),
@@ -2033,6 +2277,10 @@ class _BrowserBucketPanelState extends State<BrowserBucketPanel> {
       controller: _bucketScrollController,
       padding: EdgeInsets.zero,
       primary: false,
+      shrinkWrap: widget.compact,
+      physics: widget.compact
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
       children: [
         if (buckets.isEmpty && hasProfile)
           const Padding(
@@ -2164,7 +2412,9 @@ class _BrowserBucketPanelState extends State<BrowserBucketPanel> {
                 ),
               ),
             const SizedBox(height: 12),
-            if (widget.compact)
+            if (MediaQuery.sizeOf(context).width < 700)
+              bucketListViewport
+            else if (widget.compact)
               SizedBox(
                 height: (MediaQuery.sizeOf(context).height * 0.34)
                     .clamp(240.0, 360.0),
@@ -2224,10 +2474,16 @@ class _BrowserBucketPanelState extends State<BrowserBucketPanel> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Chip(label: Text('Region ${profile.region}')),
+              Chip(
+                label: Text(
+                  'Region ${profile.region}',
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                ),
+              ),
               Chip(
                 label: Text(
                   profile.verifyTls ? 'TLS verify on' : 'TLS verify off',
+                  style: TextStyle(color: theme.colorScheme.onSurface),
                 ),
               ),
               Chip(
@@ -2235,6 +2491,7 @@ class _BrowserBucketPanelState extends State<BrowserBucketPanel> {
                   profile.pathStyle
                       ? 'Path-style addressing'
                       : 'Virtual hosted',
+                  style: TextStyle(color: theme.colorScheme.onSurface),
                 ),
               ),
             ],

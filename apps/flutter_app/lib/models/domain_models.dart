@@ -81,6 +81,14 @@ class EventLogEntry {
     this.bucketName,
     this.objectKey,
     this.source,
+    this.requestId,
+    this.tracePhase,
+    this.engineId,
+    this.method,
+    this.responseStatus,
+    this.latencyMs,
+    this.traceHead,
+    this.traceBody,
   });
 
   final DateTime timestamp;
@@ -91,6 +99,14 @@ class EventLogEntry {
   final String? bucketName;
   final String? objectKey;
   final String? source;
+  final String? requestId;
+  final String? tracePhase;
+  final String? engineId;
+  final String? method;
+  final String? responseStatus;
+  final int? latencyMs;
+  final Object? traceHead;
+  final Object? traceBody;
 
   Map<String, Object?> toJson() {
     return {
@@ -102,6 +118,14 @@ class EventLogEntry {
       'bucketName': bucketName,
       'objectKey': objectKey,
       'source': source,
+      'requestId': requestId,
+      'tracePhase': tracePhase,
+      'engineId': engineId,
+      'method': method,
+      'responseStatus': responseStatus,
+      'latencyMs': latencyMs,
+      'traceHead': traceHead,
+      'traceBody': traceBody,
     };
   }
 }
@@ -1225,6 +1249,7 @@ class AppSettings {
     required this.browserInspectorLayout,
     required this.browserInspectorSize,
     required this.uiScalePercent,
+    required this.logTextScalePercent,
   });
 
   final bool darkMode;
@@ -1255,6 +1280,7 @@ class AppSettings {
   final BrowserInspectorLayout browserInspectorLayout;
   final int browserInspectorSize;
   final int uiScalePercent;
+  final int logTextScalePercent;
 
   Map<String, Object?> toJson() {
     return {
@@ -1286,10 +1312,12 @@ class AppSettings {
       'browserInspectorLayout': browserInspectorLayout.name,
       'browserInspectorSize': browserInspectorSize,
       'uiScalePercent': uiScalePercent,
+      'logTextScalePercent': logTextScalePercent,
     };
   }
 
   factory AppSettings.fromJson(Map<String, Object?> json) {
+    final uiScalePercent = (json['uiScalePercent'] as num?)?.toInt() ?? 80;
     return AppSettings(
       darkMode: json['darkMode'] as bool? ?? false,
       defaultEngineId: (json['defaultEngineId'] as String?) ?? 'python',
@@ -1326,7 +1354,10 @@ class AppSettings {
       ),
       browserInspectorSize:
           (json['browserInspectorSize'] as num?)?.toInt() ?? 360,
-      uiScalePercent: (json['uiScalePercent'] as num?)?.toInt() ?? 80,
+      uiScalePercent: uiScalePercent,
+      logTextScalePercent:
+          (json['logTextScalePercent'] as num?)?.toInt() ??
+              (uiScalePercent < 90 ? 90 : uiScalePercent),
     );
   }
 
@@ -1359,6 +1390,7 @@ class AppSettings {
     BrowserInspectorLayout? browserInspectorLayout,
     int? browserInspectorSize,
     int? uiScalePercent,
+    int? logTextScalePercent,
   }) {
     return AppSettings(
       darkMode: darkMode ?? this.darkMode,
@@ -1394,6 +1426,7 @@ class AppSettings {
           browserInspectorLayout ?? this.browserInspectorLayout,
       browserInspectorSize: browserInspectorSize ?? this.browserInspectorSize,
       uiScalePercent: uiScalePercent ?? this.uiScalePercent,
+      logTextScalePercent: logTextScalePercent ?? this.logTextScalePercent,
     );
   }
 }

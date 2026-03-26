@@ -180,6 +180,30 @@ class _BenchmarkWorkspaceState extends State<BenchmarkWorkspace> {
     );
   }
 
+  Widget _adaptiveFieldPair({
+    required BuildContext context,
+    required Widget leading,
+    required Widget trailing,
+  }) {
+    final phone = MediaQuery.sizeOf(context).width < 700;
+    if (phone) {
+      return Column(
+        children: [
+          leading,
+          const SizedBox(height: 12),
+          trailing,
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: leading),
+        const SizedBox(width: 12),
+        Expanded(child: trailing),
+      ],
+    );
+  }
+
   Widget _configPanel(BuildContext context, BenchmarkConfig config) {
     final selectedProfile = controller.selectedProfile;
     final bucketOptions =
@@ -387,73 +411,62 @@ class _BenchmarkWorkspaceState extends State<BenchmarkWorkspace> {
             },
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'threads',
-                  label: 'Threads',
-                  initialValue: config.concurrentThreads,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(concurrentThreads: value),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'datasetObjectCount',
-                  label: 'Dataset object count',
-                  helperText:
-                      'Object pool size for the workload. This does not stop the run.',
-                  initialValue: config.objectCount,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                        config.copyWith(objectCount: value));
-                  },
-                ),
-              ),
-            ],
+          _adaptiveFieldPair(
+            context: context,
+            leading: _numberField(
+              fieldKey: 'threads',
+              label: 'Threads',
+              initialValue: config.concurrentThreads,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(concurrentThreads: value),
+                );
+              },
+            ),
+            trailing: _numberField(
+              fieldKey: 'datasetObjectCount',
+              label: 'Dataset object count',
+              helperText:
+                  'Object pool size for the workload. This does not stop the run.',
+              initialValue: config.objectCount,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(objectCount: value),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'durationSeconds',
-                  label: 'Duration (s)',
-                  helperText: isDurationMode
-                      ? 'Active stop condition.'
-                      : 'Disabled while run mode is operation count.',
-                  enabled: isDurationMode,
-                  initialValue: config.durationSeconds,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(durationSeconds: value),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'operationCount',
-                  label: 'Operation count',
-                  helperText: isDurationMode
-                      ? 'Disabled while run mode is duration.'
-                      : 'Active stop condition.',
-                  enabled: !isDurationMode,
-                  initialValue: config.operationCount,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(operationCount: value),
-                    );
-                  },
-                ),
-              ),
-            ],
+          _adaptiveFieldPair(
+            context: context,
+            leading: _numberField(
+              fieldKey: 'durationSeconds',
+              label: 'Duration (s)',
+              helperText: isDurationMode
+                  ? 'Active stop condition.'
+                  : 'Disabled while run mode is operation count.',
+              enabled: isDurationMode,
+              initialValue: config.durationSeconds,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(durationSeconds: value),
+                );
+              },
+            ),
+            trailing: _numberField(
+              fieldKey: 'operationCount',
+              label: 'Operation count',
+              helperText: isDurationMode
+                  ? 'Disabled while run mode is duration.'
+                  : 'Active stop condition.',
+              enabled: !isDurationMode,
+              initialValue: config.operationCount,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(operationCount: value),
+                );
+              },
+            ),
           ),
           const Divider(height: 28),
           Text(
@@ -461,63 +474,51 @@ class _BenchmarkWorkspaceState extends State<BenchmarkWorkspace> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'connectTimeoutSeconds',
-                  label: 'Connect timeout',
-                  initialValue: config.connectTimeoutSeconds,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(connectTimeoutSeconds: value),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'readTimeoutSeconds',
-                  label: 'Read timeout',
-                  initialValue: config.readTimeoutSeconds,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(readTimeoutSeconds: value),
-                    );
-                  },
-                ),
-              ),
-            ],
+          _adaptiveFieldPair(
+            context: context,
+            leading: _numberField(
+              fieldKey: 'connectTimeoutSeconds',
+              label: 'Connect timeout',
+              initialValue: config.connectTimeoutSeconds,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(connectTimeoutSeconds: value),
+                );
+              },
+            ),
+            trailing: _numberField(
+              fieldKey: 'readTimeoutSeconds',
+              label: 'Read timeout',
+              initialValue: config.readTimeoutSeconds,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(readTimeoutSeconds: value),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'maxAttempts',
-                  label: 'Max attempts',
-                  initialValue: config.maxAttempts,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                        config.copyWith(maxAttempts: value));
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _numberField(
-                  fieldKey: 'maxPoolConnections',
-                  label: 'Pool connections',
-                  initialValue: config.maxPoolConnections,
-                  onChanged: (value) {
-                    controller.updateBenchmarkDraft(
-                      config.copyWith(maxPoolConnections: value),
-                    );
-                  },
-                ),
-              ),
-            ],
+          _adaptiveFieldPair(
+            context: context,
+            leading: _numberField(
+              fieldKey: 'maxAttempts',
+              label: 'Max attempts',
+              initialValue: config.maxAttempts,
+              onChanged: (value) {
+                controller
+                    .updateBenchmarkDraft(config.copyWith(maxAttempts: value));
+              },
+            ),
+            trailing: _numberField(
+              fieldKey: 'maxPoolConnections',
+              label: 'Pool connections',
+              initialValue: config.maxPoolConnections,
+              onChanged: (value) {
+                controller.updateBenchmarkDraft(
+                  config.copyWith(maxPoolConnections: value),
+                );
+              },
+            ),
           ),
           const SizedBox(height: 12),
           _numberField(

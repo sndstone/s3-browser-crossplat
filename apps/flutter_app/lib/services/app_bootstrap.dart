@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../controllers/app_controller.dart';
@@ -11,6 +12,9 @@ import 'engine_service.dart';
 import 'mock_engine_service.dart';
 
 class AppBootstrap {
+  static const MethodChannel _androidChannel =
+      MethodChannel('s3_browser_crossplat/android_engine');
+
   static Future<AppController> initialize({
     AppStateRepository? appStateRepository,
     EngineService? engineService,
@@ -47,7 +51,8 @@ class AppBootstrap {
       benchmarkLogPath: '${tempDir.path}${Platform.pathSeparator}benchmark.log',
       browserInspectorLayout: BrowserInspectorLayout.bottom,
       browserInspectorSize: 360,
-      uiScalePercent: 80,
+      uiScalePercent: 70,
+      logTextScalePercent: 90,
     );
     final storedState = await repository.loadState();
     final settings = storedState?.settings.copyWith(
@@ -85,6 +90,20 @@ class AppBootstrap {
   }
 
   static Future<String> _resolveDownloadPath() async {
+    if (Platform.isAndroid) {
+      try {
+        final nativePath =
+            await _androidChannel.invokeMethod<String>('getUserDownloadsPath');
+        if (nativePath != null && nativePath.trim().isNotEmpty) {
+          return nativePath;
+        }
+      } on PlatformException {
+        // Fall back to path_provider when the native channel is unavailable.
+      } on MissingPluginException {
+        // Fall back to path_provider during tests and unsupported platforms.
+      }
+    }
+
     final downloadDir = await getDownloadsDirectory();
     if (downloadDir != null) {
       return downloadDir.path;

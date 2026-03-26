@@ -1100,22 +1100,33 @@ class DesktopSidecarEngineService
     void Function(Map<String, Object?> event)? onEvent,
   }) async {
     final engineRoot = await _resolveEngineRoot();
+    final requestId = DateTime.now().microsecondsSinceEpoch.toString();
     final request = <String, Object?>{
-      'requestId': DateTime.now().microsecondsSinceEpoch.toString(),
+      'requestId': requestId,
       'method': method,
       'params': params ?? const <String, Object?>{},
     };
+    final requestHead = <String, Object?>{
+      'engine': entry.id,
+      'method': method,
+      'requestId': requestId,
+    };
+    final requestBody = _sanitizeForLogging(request['params']);
     _log(
       level: 'API',
       category: 'EngineRequest',
-      message: 'REQUEST ${entry.id}.$method HEAD=${_stringifyForLogging({
-            "engine": entry.id,
-            "method": method,
-            "requestId": request["requestId"]
-          })} BODY=${_stringifyForLogging(_sanitizeForLogging(request['params']))}',
+      message:
+          'REQUEST ${entry.id}.$method HEAD=${_stringifyForLogging(requestHead)} BODY=${_stringifyForLogging(requestBody)}',
       source: 'api',
       params: params,
+      requestId: requestId,
+      tracePhase: 'send',
+      engineId: entry.id,
+      method: method,
+      traceHead: requestHead,
+      traceBody: requestBody,
     );
+    final startedAt = DateTime.now();
     final response = await _host.send(
       executablePath: _join(engineRoot, entry.executable),
       arguments: entry.arguments,
@@ -1125,16 +1136,28 @@ class DesktopSidecarEngineService
       request: request,
       onEvent: onEvent,
     );
+    final latencyMs = DateTime.now().difference(startedAt).inMilliseconds;
     _handleStructuredLogs(response.stderrOutput, params: params);
+    final responseHead = <String, Object?>{
+      'ok': response.payload['ok'],
+      'requestId': requestId,
+    };
+    final responseBody = _sanitizeForLogging(response.payload);
     _log(
       level: 'API',
       category: 'EngineResponse',
-      message: 'RESPONSE ${entry.id}.$method HEAD=${_stringifyForLogging({
-            "ok": response.payload["ok"],
-            "requestId": request["requestId"]
-          })} BODY=${_stringifyForLogging(_sanitizeForLogging(response.payload))}',
+      message:
+          'RESPONSE ${entry.id}.$method HEAD=${_stringifyForLogging(responseHead)} BODY=${_stringifyForLogging(responseBody)}',
       source: 'api',
       params: params,
+      requestId: requestId,
+      tracePhase: 'response',
+      engineId: entry.id,
+      method: method,
+      responseStatus: _responseStatusLabel(response.payload),
+      latencyMs: latencyMs,
+      traceHead: responseHead,
+      traceBody: responseBody,
     );
 
     final payload = response.payload;
@@ -1175,6 +1198,14 @@ class DesktopSidecarEngineService
     required String message,
     required String source,
     Map<String, Object?>? params,
+    String? requestId,
+    String? tracePhase,
+    String? engineId,
+    String? method,
+    String? responseStatus,
+    int? latencyMs,
+    Object? traceHead,
+    Object? traceBody,
   }) {
     final sink = _logSink;
     if (sink == null) {
@@ -1189,6 +1220,14 @@ class DesktopSidecarEngineService
         bucketName: _bucketNameFromParams(params),
         objectKey: _objectKeyFromParams(params),
         source: source,
+        requestId: requestId,
+        tracePhase: tracePhase,
+        engineId: engineId,
+        method: method,
+        responseStatus: responseStatus,
+        latencyMs: latencyMs,
+        traceHead: traceHead,
+        traceBody: traceBody,
       ),
     );
   }
@@ -1292,6 +1331,20 @@ class DesktopSidecarEngineService
     return '${encoded.substring(0, maxLength)}...';
   }
 
+  String _responseStatusLabel(Map<String, Object?> payload) {
+    if (payload['ok'] == true) {
+      return 'ok';
+    }
+    final error = Map<String, Object?>.from(
+      payload['error'] as Map? ?? const <String, Object?>{},
+    );
+    final code = error['code'] as String?;
+    if (code != null && code.isNotEmpty) {
+      return code;
+    }
+    return 'error';
+  }
+
   Future<Map<String, _EngineManifestEntry>> _loadManifest() async {
     if (_cachedManifest != null) {
       return _cachedManifest!;
@@ -1323,11 +1376,8 @@ class DesktopSidecarEngineService
       return _cachedEngineRoot!;
     }
 
-    final executableDir = File(Platform.resolvedExecutable).parent.path;
-    final appContentsDir = Directory(executableDir).parent.path;
     final candidates = <String>[
-      _join(appContentsDir, 'Resources', 'engines'),
-      _join(executableDir, 'engines'),
+      _join(File(Platform.resolvedExecutable).parent.path, 'engines'),
       _join(Directory.current.path, 'engines'),
       _join(Directory.current.path, '..', '..', 'engines'),
       _join(_join(Directory.current.path, '..', '..', '..'), 'engines'),
@@ -1926,7 +1976,7 @@ class _EngineManifestEntry {
   factory _EngineManifestEntry.fromJson(Map<String, Object?> json) {
     return _EngineManifestEntry(
       id: json['id'] as String? ?? '',
-      version: json['version'] as String? ?? '2.0.8',
+      version: json['version'] as String? ?? '2.0.10',
       executable: json['executable'] as String? ?? '',
       arguments: (json['arguments'] as List<Object?>? ?? const [])
           .map((item) => item.toString())

@@ -1,8 +1,8 @@
 [Setup]
-AppName=S3 Browser Cross Platform
-AppVersion=2.0.8
-DefaultDirName={autopf}\S3 Browser Cross Platform
-DefaultGroupName=S3 Browser Cross Platform
+AppName=S3 Browser Crossplat
+AppVersion=2.0.10
+DefaultDirName={autopf}\S3 Browser Crossplat
+DefaultGroupName=S3 Browser Crossplat
 OutputBaseFilename=s3-browser-crossplat-installer
 
 [Files]

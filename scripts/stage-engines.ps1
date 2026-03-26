@@ -364,13 +364,13 @@ Stage-RustEngine
 Stage-JavaEngine
 
 $Manifest = @{
-    version = "2.0.8"
+    version = "2.0.10"
     architecture = $Arch
     generatedAt = (Get-Date).ToString("o")
     engines = @(
         @{
             id = "python"
-            version = "2.0.8"
+            version = "2.0.10"
             executable = "python\python.exe"
             arguments = @("engine\main.py")
             workingDirectory = "python"
@@ -381,7 +381,7 @@ $Manifest = @{
         },
         @{
             id = "go"
-            version = "2.0.8"
+            version = "2.0.10"
             executable = "go\s3-browser-go-engine.exe"
             arguments = @()
             workingDirectory = "go"
@@ -391,7 +391,7 @@ $Manifest = @{
         },
         @{
             id = "rust"
-            version = "2.0.8"
+            version = "2.0.10"
             executable = "rust\s3-browser-rust-engine.exe"
             arguments = @()
             workingDirectory = "rust"
@@ -401,7 +401,7 @@ $Manifest = @{
         },
         @{
             id = "java"
-            version = "2.0.8"
+            version = "2.0.10"
             executable = "java\run-java-engine.bat"
             arguments = @()
             workingDirectory = "java"

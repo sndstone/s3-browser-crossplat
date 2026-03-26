@@ -13,7 +13,6 @@ $EnginesDir = Join-Path $AppReleaseDir "engines"
 $EngineManifestPath = Join-Path $EnginesDir "manifest.json"
 $GeneratedWxs = Join-Path $RootDir "packaging\windows\Product.generated.wxs"
 $ArtifactDir = Join-Path $RootDir "dist\windows"
-$MsiPath = Join-Path $ArtifactDir "s3-browser-crossplat-windows-$Arch.msi"
 
 if ($Help) {
     Write-Host "Usage:"
@@ -29,22 +28,26 @@ function Resolve-ToolsDir {
     }
 
     $ResolvedTarget = (Resolve-Path $TargetPath).Path
-    $SubstOutput = cmd /c subst 2>$null
-    foreach ($Line in $SubstOutput) {
-        if ($Line -match '^([A-Z]:)\\: => (.+)$') {
-            $MappedPath = $matches[2].Trim()
-            if ($MappedPath -eq $ResolvedTarget) {
-                return "$($matches[1])\."
+    try {
+        $SubstOutput = & subst.exe 2>$null
+        foreach ($Line in $SubstOutput) {
+            if ($Line -match '^([A-Z]:)\\: => (.+)$') {
+                $MappedPath = $matches[2].Trim()
+                if ($MappedPath -eq $ResolvedTarget) {
+                    return "$($matches[1])\."
+                }
             }
         }
-    }
 
-    foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
-        $DriveName = "${Letter}:"
-        if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
-            cmd /c "subst $DriveName `"$ResolvedTarget`"" | Out-Null
-            return "$DriveName\."
+        foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
+            $DriveName = "${Letter}:"
+            if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
+                & subst.exe $DriveName $ResolvedTarget | Out-Null
+                return "$DriveName\."
+            }
         }
+    } catch {
+        return $ResolvedTarget
     }
 
     return $ResolvedTarget
@@ -118,7 +121,7 @@ if ($null -eq $WixCli -and ($null -eq $Candle -or $null -eq $Light)) {
     throw "Neither WiX v4 CLI nor WiX v3 candle/light were found after bootstrap."
 }
 
-$Version = "2.0.8"
+$Version = "2.0.10"
 $PubspecPath = Join-Path $FlutterDir "pubspec.yaml"
 if (Test-Path $PubspecPath) {
     $VersionMatch = Select-String -Path $PubspecPath -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)'
@@ -126,6 +129,7 @@ if (Test-Path $PubspecPath) {
         $Version = $VersionMatch.Matches[0].Groups[1].Value
     }
 }
+$MsiPath = Join-Path $ArtifactDir "s3-browser-crossplat-windows-$Version-$Arch.msi"
 
 $Files = Get-ChildItem -Path $AppReleaseDir -Recurse -File | Sort-Object FullName
 $DirectoryRels = New-Object System.Collections.Generic.HashSet[string]

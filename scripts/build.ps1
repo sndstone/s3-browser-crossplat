@@ -16,6 +16,14 @@ $ScriptPath = $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptPath)
 $ToolCacheDir = Join-Path $RootDir ".tmp\toolchains"
 
+function Get-WindowsSystemPath {
+    $SystemRoot = if ($env:SystemRoot) { $env:SystemRoot } else { "C:\Windows" }
+    return @(
+        (Join-Path $SystemRoot "System32"),
+        $SystemRoot
+    ) -join ";"
+}
+
 function Exit-Build {
     param(
         [int]$Code = 0
@@ -168,22 +176,26 @@ function Resolve-ToolsDir {
     }
 
     $ResolvedTarget = (Resolve-Path $TargetPath).Path
-    $SubstOutput = cmd /c subst 2>$null
-    foreach ($Line in $SubstOutput) {
-        if ($Line -match '^([A-Z]:)\\: => (.+)$') {
-            $MappedPath = $matches[2].Trim()
-            if ($MappedPath -eq $ResolvedTarget) {
-                return "$($matches[1])\."
+    try {
+        $SubstOutput = & subst.exe 2>$null
+        foreach ($Line in $SubstOutput) {
+            if ($Line -match '^([A-Z]:)\\: => (.+)$') {
+                $MappedPath = $matches[2].Trim()
+                if ($MappedPath -eq $ResolvedTarget) {
+                    return "$($matches[1])\."
+                }
             }
         }
-    }
 
-    foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
-        $DriveName = "${Letter}:"
-        if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
-            cmd /c "subst $DriveName `"$ResolvedTarget`"" | Out-Null
-            return "$DriveName\."
+        foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
+            $DriveName = "${Letter}:"
+            if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
+                & subst.exe $DriveName $ResolvedTarget | Out-Null
+                return "$DriveName\."
+            }
         }
+    } catch {
+        return $ResolvedTarget
     }
 
     return $ResolvedTarget
@@ -201,7 +213,7 @@ if ($Help) {
     Write-Host ""
     Write-Host "Platforms:"
     Write-Host "  windows  Build the Windows desktop app (default)"
-    Write-Host "  android  Build the sideloadable arm64 APK and the App Bundle"
+    Write-Host "  android  Build the sideloadable arm64 APK and the secondary App Bundle"
     Write-Host ""
     Write-Host "Switches:"
     Write-Host "  -Installer msi|none       Build a Windows MSI after the desktop app build (default: msi)"
@@ -209,7 +221,7 @@ if ($Help) {
     Write-Host "  -OpenDeveloperSettings    Open the Windows Developer Mode settings page before building"
     Write-Host ""
     Write-Host "Windows builds relaunch themselves elevated if symlink support is unavailable."
-    Write-Host "Android builds stage an SDK under .tmp\toolchains\android-sdk and emit app-arm64-v8a-release.apk."
+    Write-Host "Android builds stage an SDK under .tmp\toolchains\android-sdk, sign the release output with the debug key, and emit app-arm64-v8a-release.apk for sideloading."
     Exit-Build 0
 }
 
@@ -236,7 +248,7 @@ $ToolsDir = Resolve-ToolsDir -TargetPath $ToolCacheDir
 
 $env:CARGO_HOME = Join-Path $ToolsDir "cargo"
 $env:RUSTUP_HOME = Join-Path $ToolsDir "rustup"
-$env:PATH = "$(Join-Path $ToolsDir 'flutter\bin');$(Join-Path $ToolsDir 'go\bin');$(Join-Path $ToolsDir 'java\bin');$(Join-Path $ToolsDir 'cargo\bin');$(Join-Path $ToolsDir 'wix');$(Join-Path $ToolsDir 'wix\bin');$(Join-Path $ToolsDir 'android-sdk\cmdline-tools\latest\bin');$(Join-Path $ToolsDir 'android-sdk\platform-tools');$env:PATH"
+$env:PATH = "$(Get-WindowsSystemPath);$(Join-Path $ToolsDir 'flutter\bin');$(Join-Path $ToolsDir 'go\bin');$(Join-Path $ToolsDir 'java\bin');$(Join-Path $ToolsDir 'cargo\bin');$(Join-Path $ToolsDir 'wix');$(Join-Path $ToolsDir 'wix\bin');$(Join-Path $ToolsDir 'android-sdk\cmdline-tools\latest\bin');$(Join-Path $ToolsDir 'android-sdk\platform-tools');$env:PATH"
 $env:JAVA_HOME = Join-Path $ToolsDir "java"
 $env:ANDROID_SDK_ROOT = Join-Path $ToolsDir "android-sdk"
 $env:ANDROID_HOME = $env:ANDROID_SDK_ROOT
@@ -245,6 +257,18 @@ $LogDir = Join-Path $RootDir ".tmp\logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $AnalyzeLog = Join-Path $LogDir "flutter-analyze-$Platform-$Arch.log"
 $BuildLog = Join-Path $LogDir "flutter-build-$Platform-$Arch.log"
+
+function Get-AppVersion {
+    $PubspecPath = Join-Path $FlutterDir "pubspec.yaml"
+    $Version = "2.0.10"
+    if (Test-Path $PubspecPath) {
+        $VersionMatch = Select-String -Path $PubspecPath -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)'
+        if ($VersionMatch) {
+            $Version = $VersionMatch.Matches[0].Groups[1].Value
+        }
+    }
+    return $Version
+}
 
 function New-ShortJunction {
     param(
@@ -320,7 +344,7 @@ function Stop-StaleWindowsBuildProcesses {
 
     $Processes = Get-Process -Name "s3_browser_crossplat" -ErrorAction SilentlyContinue
     foreach ($Process in $Processes) {
-        Write-Host "Stopping running S3 Browser Cross Platform process (PID $($Process.Id))"
+        Write-Host "Stopping running S3 Browser Crossplat process (PID $($Process.Id))"
         Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
         $Stopped = $true
     }
@@ -421,22 +445,35 @@ if ($Platform -eq "windows") {
     }
     Exit-Build 0
 } elseif ($Platform -eq "android") {
-    Write-Host "Building Android APK (arm64, sideloadable debug-signed release)..."
+    Write-Host "Building Android APK (arm64, sideloadable release signed with the debug key)..."
     & flutter build apk --release --target-platform android-arm64 --split-per-abi 2>&1 | Tee-Object -FilePath $BuildLog
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Build log written to $BuildLog"
         Pop-Location
         Exit-Build $LASTEXITCODE
     }
-    Write-Host "Building Android App Bundle..."
+    Write-Host "Building Android App Bundle (secondary artifact)..."
     & flutter build appbundle --release --target-platform android-arm64 2>&1 | Tee-Object -FilePath $BuildLog -Append
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Build log written to $BuildLog"
         Pop-Location
         Exit-Build $LASTEXITCODE
     }
-    Write-Host "APK artifact: $(Join-Path $FlutterDir 'build\app\outputs\flutter-apk\app-arm64-v8a-release.apk')"
-    Write-Host "AAB artifact: $(Join-Path $FlutterDir 'build\app\outputs\bundle\release\app-release.aab')"
+    $Version = Get-AppVersion
+    $AndroidArtifactDir = Join-Path $RootDir "dist\android"
+    $SourceApk = Join-Path $FlutterDir "build\app\outputs\flutter-apk\app-arm64-v8a-release.apk"
+    $SourceAab = Join-Path $FlutterDir "build\app\outputs\bundle\release\app-release.aab"
+    $VersionedApk = Join-Path $AndroidArtifactDir "s3-browser-crossplat-android-$Version-arm64.apk"
+    $VersionedAab = Join-Path $AndroidArtifactDir "s3-browser-crossplat-android-$Version-arm64.aab"
+    New-Item -ItemType Directory -Force -Path $AndroidArtifactDir | Out-Null
+    if (Test-Path $SourceApk) {
+        Copy-Item -Path $SourceApk -Destination $VersionedApk -Force
+    }
+    if (Test-Path $SourceAab) {
+        Copy-Item -Path $SourceAab -Destination $VersionedAab -Force
+    }
+    Write-Host "Primary APK artifact: $VersionedApk"
+    Write-Host "Secondary AAB artifact: $VersionedAab"
 }
 
 Pop-Location

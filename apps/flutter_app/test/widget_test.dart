@@ -52,6 +52,7 @@ Future<TestAppController> _buildController() async {
       browserInspectorLayout: BrowserInspectorLayout.bottom,
       browserInspectorSize: 360,
       uiScalePercent: 80,
+      logTextScalePercent: 90,
     ),
     initialProfiles: const [
       EndpointProfile(
@@ -153,6 +154,40 @@ Finder _debugSwitchFinder() {
   });
 }
 
+EventLogEntry _apiTraceEntry({
+  required String phase,
+  required String requestId,
+  required DateTime timestamp,
+  String? objectKey,
+  int? latencyMs,
+}) {
+  return EventLogEntry(
+    timestamp: timestamp,
+    level: 'API',
+    category: phase == 'send' ? 'EngineRequest' : 'EngineResponse',
+    message: '$phase trace',
+    profileId: 'test',
+    bucketName: 'bucket-0',
+    objectKey: objectKey,
+    source: 'api',
+    requestId: requestId,
+    tracePhase: phase,
+    engineId: 'rust',
+    method: 'HeadObject',
+    responseStatus: phase == 'response' ? 'ok' : null,
+    latencyMs: latencyMs,
+    traceHead: {
+      'requestId': requestId,
+      'phase': phase,
+    },
+    traceBody: {
+      'bucket': 'bucket-0',
+      if (objectKey != null) 'key': objectKey,
+      'phase': phase,
+    },
+  );
+}
+
 void main() {
   testWidgets('app shell renders before deferred initialization completes', (
     WidgetTester tester,
@@ -191,6 +226,7 @@ void main() {
         browserInspectorLayout: BrowserInspectorLayout.bottom,
         browserInspectorSize: 360,
         uiScalePercent: 80,
+        logTextScalePercent: 90,
       ),
       initialProfiles: const [
         EndpointProfile(
@@ -210,7 +246,7 @@ void main() {
 
     await tester.pumpWidget(S3BrowserApp(controller: controller));
 
-    expect(find.text('S3 Browser Cross Platform'), findsOneWidget);
+    expect(find.text('S3 Browser Crossplat'), findsOneWidget);
   });
 
   testWidgets('app renders top-level workspaces', (WidgetTester tester) async {
@@ -223,7 +259,7 @@ void main() {
     await tester.pumpWidget(S3BrowserApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('S3 Browser Cross Platform'), findsOneWidget);
+    expect(find.text('S3 Browser Crossplat'), findsOneWidget);
     expect(find.text('Browser'), findsWidgets);
     expect(find.text('Benchmark'), findsWidgets);
     expect(find.text('Tasks'), findsWidgets);
@@ -308,59 +344,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('bucket-39'), findsOneWidget);
-  });
-
-  testWidgets('event log shows latest export path with open actions', (
-    WidgetTester tester,
-  ) async {
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.binding.setSurfaceSize(const Size(1440, 1024));
-
-    final controller = await _buildController();
-    controller.activeTab = WorkspaceTab.eventLog;
-    controller.lastExportedEventLogPath = '/tmp/event-log-123.log';
-    controller.emitChange();
-
-    await tester.pumpWidget(S3BrowserApp(controller: controller));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Latest export'), findsOneWidget);
-    expect(find.text('/tmp/event-log-123.log'), findsOneWidget);
-    expect(find.byTooltip('Open log'), findsOneWidget);
-    expect(find.byTooltip('Open file location'), findsOneWidget);
-  });
-
-  testWidgets('selected profile summary uses explicit readable stat colors', (
-    WidgetTester tester,
-  ) async {
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.binding.setSurfaceSize(const Size(1440, 1024));
-
-    final controller = await _buildController();
-    await tester.pumpWidget(
-      _browserApp(
-        controller,
-        size: const Size(1440, 1024),
-        compact: false,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final richText = tester.widget<RichText>(
-      find.byWidgetPredicate((widget) {
-        if (widget is! RichText) {
-          return false;
-        }
-        final span = widget.text;
-        return span is TextSpan && span.toPlainText().contains('Profile ID:');
-      }).first,
-    );
-
-    final span = richText.text as TextSpan;
-    final valueSpan = span.children![1] as TextSpan;
-
-    expect(span.style?.color, isNotNull);
-    expect(valueSpan.style?.color, isNotNull);
   });
 
   testWidgets('tasks workspace renders top-level running task details', (
@@ -569,5 +552,109 @@ void main() {
         .widgetList<Text>(find.text('Test'))
         .where((text) => text.style?.color == Colors.black87);
     expect(compactTexts, isNotEmpty);
+  });
+
+  testWidgets('event log groups API traces into expandable cards', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(1440, 1024));
+    final controller = await _buildController();
+    controller.activeTab = WorkspaceTab.eventLog;
+    controller.eventLog = [
+      _apiTraceEntry(
+        phase: 'response',
+        requestId: 'req-1',
+        timestamp: DateTime(2026, 3, 22, 16, 0, 2),
+        objectKey: 'backup-tool-v1.2.zip',
+        latencyMs: 42,
+      ),
+      _apiTraceEntry(
+        phase: 'send',
+        requestId: 'req-1',
+        timestamp: DateTime(2026, 3, 22, 16, 0, 1),
+        objectKey: 'backup-tool-v1.2.zip',
+      ),
+      EventLogEntry(
+        timestamp: DateTime(2026, 3, 22, 15, 59, 59),
+        level: 'INFO',
+        category: 'Settings',
+        message: 'Updated application settings.',
+      ),
+    ];
+    controller.emitChange();
+
+    await tester.pumpWidget(S3BrowserApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HeadObject'), findsOneWidget);
+    expect(find.text('Updated application settings.'), findsOneWidget);
+    expect(find.text('Raw event text'), findsNothing);
+
+    await tester.tap(find.text('HeadObject'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Send'), findsOneWidget);
+    expect(find.text('Response'), findsOneWidget);
+    expect(find.text('Raw event text'), findsOneWidget);
+  });
+
+  testWidgets('events and debug inspector renders grouped trace cards', (
+    WidgetTester tester,
+  ) async {
+    final controller = await _buildController();
+    controller.inspectorTab = BrowserInspectorTab.eventsAndDebug;
+    controller.selectedObjectDetails = const ObjectDetails(
+      key: 'backup-tool-v1.2.zip',
+      metadata: {},
+      headers: {},
+      tags: {},
+      debugEvents: [],
+      apiCalls: [],
+      debugLogExcerpt: ['Resolved endpoint'],
+    );
+    controller.eventLog = [
+      _apiTraceEntry(
+        phase: 'response',
+        requestId: 'req-2',
+        timestamp: DateTime(2026, 3, 22, 16, 10, 2),
+        objectKey: 'backup-tool-v1.2.zip',
+        latencyMs: 31,
+      ),
+      _apiTraceEntry(
+        phase: 'send',
+        requestId: 'req-2',
+        timestamp: DateTime(2026, 3, 22, 16, 10, 1),
+        objectKey: 'backup-tool-v1.2.zip',
+      ),
+    ];
+    controller.emitChange();
+
+    await tester.pumpWidget(
+      _browserApp(
+        controller,
+        size: const Size(1440, 1024),
+        compact: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Trace log'), findsOneWidget);
+    expect(find.text('HeadObject'), findsOneWidget);
+    expect(find.text('Debug excerpt'), findsOneWidget);
+  });
+
+  testWidgets('phone shell uses bottom navigation instead of top tabs', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    final controller = await _buildController();
+
+    await tester.pumpWidget(S3BrowserApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(SegmentedButton<WorkspaceTab>), findsNothing);
   });
 }

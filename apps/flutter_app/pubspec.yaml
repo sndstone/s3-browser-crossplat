@@ -1,7 +1,7 @@
 name: s3_browser_crossplat
 description: Cross-platform S3 browser with pluggable backend engines.
 publish_to: "none"
-version: 2.0.8+1
+version: 2.0.10+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -13,6 +13,7 @@ dependencies:
   desktop_drop: ^0.6.0
   file_picker: ^8.0.0+1
   flutter_secure_storage: ^9.2.2
+  google_fonts: ^6.2.1
   path_provider: ^2.1.4
 
 dev_dependencies:

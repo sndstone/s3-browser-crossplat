@@ -1,4 +1,4 @@
-# S3 Browser Cross Platform
+# s3_browser_crossplat
 
 A new Flutter project.
 

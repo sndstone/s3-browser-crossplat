@@ -51,6 +51,7 @@ const _settings = AppSettings(
   browserInspectorLayout: BrowserInspectorLayout.bottom,
   browserInspectorSize: 360,
   uiScalePercent: 80,
+  logTextScalePercent: 90,
 );
 
 const _profile = EndpointProfile(

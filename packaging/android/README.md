@@ -2,7 +2,11 @@
 
 Expected artifacts:
 
-- `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
-- `build/app/outputs/bundle/release/app-release.aab`
+- Primary sideloadable APK, copied to:
+  `dist/android/s3-browser-crossplat-android-<version>-arm64.apk`
+- Secondary Android App Bundle, copied to:
+  `dist/android/s3-browser-crossplat-android-<version>-arm64.aab`
+
+Raw Flutter outputs remain under `build/app/outputs/...` during the build.
 
 Rust and Go mobile adapters are the supported Android engine set. Python and Java are desktop-only.

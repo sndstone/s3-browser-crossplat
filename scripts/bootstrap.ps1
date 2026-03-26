@@ -14,6 +14,14 @@ $RootDir = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $ToolCacheDir = Join-Path $RootDir ".tmp\toolchains"
 New-Item -ItemType Directory -Force -Path $ToolCacheDir | Out-Null
 
+function Get-WindowsSystemPath {
+    $SystemRoot = if ($env:SystemRoot) { $env:SystemRoot } else { "C:\Windows" }
+    return @(
+        (Join-Path $SystemRoot "System32"),
+        $SystemRoot
+    ) -join ";"
+}
+
 if ($Help) {
     Write-Host "Usage:"
     Write-Host "  .\scripts\bootstrap.ps1"
@@ -37,22 +45,26 @@ function Resolve-ToolsDir {
     )
 
     $ResolvedTarget = (Resolve-Path $TargetPath).Path
-    $SubstOutput = cmd /c subst 2>$null
-    foreach ($Line in $SubstOutput) {
-        if ($Line -match '^([A-Z]:)\\: => (.+)$') {
-            $MappedPath = $matches[2].Trim()
-            if ($MappedPath -eq $ResolvedTarget) {
-                return "$($matches[1])\."
+    try {
+        $SubstOutput = & subst.exe 2>$null
+        foreach ($Line in $SubstOutput) {
+            if ($Line -match '^([A-Z]:)\\: => (.+)$') {
+                $MappedPath = $matches[2].Trim()
+                if ($MappedPath -eq $ResolvedTarget) {
+                    return "$($matches[1])\."
+                }
             }
         }
-    }
 
-    foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
-        $DriveName = "${Letter}:"
-        if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
-            cmd /c "subst $DriveName `"$ResolvedTarget`"" | Out-Null
-            return "$DriveName\."
+        foreach ($Letter in @('S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z')) {
+            $DriveName = "${Letter}:"
+            if (-not (Get-PSDrive -Name $Letter -ErrorAction SilentlyContinue)) {
+                & subst.exe $DriveName $ResolvedTarget | Out-Null
+                return "$DriveName\."
+            }
         }
+    } catch {
+        return $ResolvedTarget
     }
 
     return $ResolvedTarget
@@ -80,6 +92,7 @@ function Invoke-WebRequestCompat {
 }
 
 $ToolsDir = Resolve-ToolsDir -TargetPath $ToolCacheDir
+$env:PATH = "$(Get-WindowsSystemPath);$env:PATH"
 
 function Download-File {
     param(
@@ -115,7 +128,10 @@ function Remove-DirectoryIfExists {
     )
 
     if (Test-Path $Path) {
-        Remove-Item -Recurse -Force $Path
+        $null = & cmd.exe /c "rmdir /s /q `"$Path`""
+        if (Test-Path $Path) {
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $Path
+        }
     }
 }
 
@@ -125,7 +141,10 @@ function Expand-ZipToStaging {
         [string]$StageName
     )
 
-    $StageDir = Join-Path $ToolsDir $StageName
+    $StageDrive = [System.IO.Path]::GetPathRoot($(if ($env:SystemRoot) { $env:SystemRoot } else { "C:\Windows" }))
+    $StageRoot = Join-Path $StageDrive "_s3b"
+    New-Item -ItemType Directory -Force -Path $StageRoot | Out-Null
+    $StageDir = Join-Path $StageRoot $StageName
     Remove-DirectoryIfExists $StageDir
     [System.IO.Compression.ZipFile]::ExtractToDirectory($Archive, $StageDir)
     return $StageDir
@@ -133,14 +152,13 @@ function Expand-ZipToStaging {
 
 function Ensure-Flutter {
     $Dir = Join-Path $ToolsDir "flutter"
-    if (-not (Test-Path (Join-Path $Dir "bin\flutter.bat"))) {
-        Remove-DirectoryIfExists $Dir
+    $FlutterBat = Join-Path $Dir "bin\flutter.bat"
+    $GitDir = Join-Path $Dir ".git"
+    $BundledGit = Join-Path $Dir "bin\mingit\cmd\git.exe"
+    $NeedsArchiveInstall = (-not (Test-Path $FlutterBat)) -or (-not (Test-Path $GitDir)) -or (-not (Test-Path $BundledGit))
 
-        $Git = Get-Command git -ErrorAction SilentlyContinue
-        if ($null -ne $Git) {
-            & git clone https://github.com/flutter/flutter.git --depth 1 -b stable $Dir
-            return
-        }
+    if ($NeedsArchiveInstall) {
+        Remove-DirectoryIfExists $Dir
 
         $ReleaseIndex = Invoke-RestMethod -Uri "https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json"
         $StableHash = $ReleaseIndex.current_release.stable
@@ -270,14 +288,14 @@ function Ensure-AndroidSdk {
 
     $env:ANDROID_SDK_ROOT = $AndroidRoot
     $env:ANDROID_HOME = $AndroidRoot
-    $env:PATH = "$(Join-Path $LatestDir 'bin');$(Join-Path $AndroidRoot 'platform-tools');$env:PATH"
+    $env:PATH = "$(Join-Path $LatestDir 'bin');$(Join-Path $AndroidRoot 'platform-tools');$(Get-WindowsSystemPath);$env:PATH"
     if (Test-Path (Join-Path $ToolsDir "java\bin\java.exe")) {
         $env:JAVA_HOME = Join-Path $ToolsDir "java"
         $env:PATH = "$(Join-Path $env:JAVA_HOME 'bin');$env:PATH"
     }
 
     $LicenseCommand = '(for /l %i in (1,1,40) do @echo y) | "' + $SdkManager + '" --sdk_root="' + $AndroidRoot + '" --licenses >nul'
-    & cmd.exe /c $LicenseCommand | Out-Null
+    $null = & cmd.exe /c $LicenseCommand
     $global:LASTEXITCODE = 0
 
     foreach ($Package in @(
