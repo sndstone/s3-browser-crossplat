@@ -12,13 +12,12 @@ permissions:
   contents: write
 
 jobs:
-  prepare:
+  publish:
     runs-on: ubuntu-24.04
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - id: version
+      - name: Read version
+        id: version
         run: |
           version="$(sed -n 's/^version: \([0-9][0-9.]*\)+.*/\1/p' apps/flutter_app/pubspec.yaml)"
           if [ -z "$version" ]; then
@@ -26,33 +25,9 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-  windows-x64:
-    needs: prepare
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Windows MSI
-        shell: pwsh
-        run: .\scripts\build.ps1 -Platform windows -Arch x64 -Installer msi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-x64
-          path: dist/windows/*.msi
-
-  publish:
-    needs:
-      - prepare
-      - windows-x64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: release-assets
       - name: Write release notes
         env:
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           awk -v version="$VERSION" '
             /^## / {
@@ -74,7 +49,7 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -89,5 +64,3 @@ jobs:
               --notes-file release-notes.md \
               --latest
           fi
-          find release-assets -type f -name '*.msi' -print0 |
-            xargs -0 -r gh release upload "$tag" --clobber
