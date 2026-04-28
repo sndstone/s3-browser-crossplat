@@ -1,6 +1,7 @@
 name: s3_browser_crossplat
 description: Cross-platform S3 browser with pluggable backend engines.
 publish_to: "none"
+# The release workflow reads this version when publishing GitHub Releases.
 version: 2.0.12+1
 
 environment:
