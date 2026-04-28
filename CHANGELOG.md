@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.12 - 2026-04-28
+
+- Added task/listing cancellation hooks so long bucket and object listings can stop cleanly and show partial results.
+- Improved benchmark startup feedback, default throughput settings, and reduced-noise benchmark logging for heavier test runs.
+- Refined desktop density, browser panel sizing, compact selectors, and mobile bucket-to-object navigation.
+- Fixed Android profile import handling and Android version details so desktop-only dependencies and engines are filtered out.
+- Bumped app metadata to 2.0.12.
+
 ## 2.0.10 - 2026-03-25
 
 - Refined the Tasks tab selector hover and selection styling to remove the awkward square overlay artifact.
