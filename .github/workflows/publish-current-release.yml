@@ -1,0 +1,110 @@
+name: Publish Current Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/flutter_app/pubspec.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: |
+          version="$(sed -n 's/^version: \([0-9][0-9.]*\)+.*/\1/p' apps/flutter_app/pubspec.yaml)"
+          if [ -z "$version" ]; then
+            echo "Unable to read version from pubspec.yaml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows-x64:
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Windows MSI
+        shell: pwsh
+        run: .\scripts\build.ps1 -Platform windows -Arch x64 -Installer msi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/windows/*.msi
+
+  android-arm64:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Android arm64 artifacts
+        run: ./scripts/build.sh android arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-arm64
+          path: |
+            apps/flutter_app/build/app/outputs/flutter-apk/*.apk
+            apps/flutter_app/build/app/outputs/bundle/release/*.aab
+            dist/android/*
+
+  publish:
+    needs:
+      - prepare
+      - windows-x64
+      - android-arm64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - name: Write release notes
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          awk -v version="$VERSION" '
+            /^## / {
+              if (found) {
+                exit
+              }
+              if ($2 == version) {
+                found = 1
+                next
+              }
+            }
+            found {
+              print
+            }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            printf 'Release %s.\n' "$VERSION" > release-notes.md
+          fi
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" \
+              --title "Version $VERSION" \
+              --notes-file release-notes.md \
+              --latest
+          else
+            gh release create "$tag" \
+              --target "$GITHUB_SHA" \
+              --title "Version $VERSION" \
+              --notes-file release-notes.md \
+              --latest
+          fi
+          find release-assets -type f \
+            \( -name '*.msi' -o -name '*.apk' -o -name '*.aab' \) \
+            -print0 | xargs -0 -r gh release upload "$tag" --clobber
