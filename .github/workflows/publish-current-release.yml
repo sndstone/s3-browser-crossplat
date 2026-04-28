@@ -40,26 +40,10 @@ jobs:
           name: windows-x64
           path: dist/windows/*.msi
 
-  android-arm64:
-    needs: prepare
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Android arm64 artifacts
-        run: ./scripts/build.sh android arm64
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-arm64
-          path: |
-            apps/flutter_app/build/app/outputs/flutter-apk/*.apk
-            apps/flutter_app/build/app/outputs/bundle/release/*.aab
-            dist/android/*
-
   publish:
     needs:
       - prepare
       - windows-x64
-      - android-arm64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +89,5 @@ jobs:
               --notes-file release-notes.md \
               --latest
           fi
-          find release-assets -type f \
-            \( -name '*.msi' -o -name '*.apk' -o -name '*.aab' \) \
-            -print0 | xargs -0 -r gh release upload "$tag" --clobber
+          find release-assets -type f -name '*.msi' -print0 |
+            xargs -0 -r gh release upload "$tag" --clobber
